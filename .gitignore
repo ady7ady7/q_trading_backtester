@@ -24,3 +24,6 @@ data/FDAX_trades_raw.csv
 # OS
 .DS_Store
 Thumbs.db
+
+.env
+nq_trades_data.dbn.zst
