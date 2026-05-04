@@ -1,0 +1,5 @@
+pandas>=2.3.3
+numpy>=2.4.0
+
+#pypi.org/project/<name> to quickly check current versions
+#or pip index versions <package name>
