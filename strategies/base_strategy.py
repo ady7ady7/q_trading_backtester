@@ -17,11 +17,11 @@ class BaseStrategy(ABC):
     def generate_signal(self, row: pd.Series, current_date) -> str:
         pass
     
-    @abstractmethod
-    def session_start(self) -> time | None: ...
+    def session_start(self) -> time:
+        return None
 
-    @abstractmethod  
-    def session_end(self) -> time | None: ...
+    def session_end(self) -> time:
+        return None
     
     def get_sl(self, row: pd.Series, current_date) -> float:
         '''Override to give dynamic SL. This is just default.'''

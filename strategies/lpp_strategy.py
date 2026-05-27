@@ -4,13 +4,27 @@ import pandas as pd
 
 class LPPStrategy(BaseStrategy):
     '''A class with abstract method used to generate trading signal'''
-    def __init__(self, ticker, side: str = None, entry: str = None, sl: str = None, tp: str = None):
+    def __init__(self, 
+                 ticker,
+                 side: str = None,
+                 entry: str = None,
+                 sl: str = None,
+                 tp: str = None,
+                 premarket_start = time(9, 0),
+                 premarket_end = time(10, 0),
+                 session_start = time(10, 0),
+                 session_end = time(17, 30)
+                 ):
         super().__init__(f'LPP Strategy')
         self.ticker = ticker
         self.side = side
         self.entry = entry
         self.sl = sl
         self.tp = tp
+        self._session_start = session_start
+        self._session_end = session_end
+        self._premarket_start = premarket_start
+        self._premarket_end = premarket_end
         self.levels_by_date: dict = {}
         
     def generate_signal(self, row: pd.Series, current_date) -> str:
@@ -36,17 +50,17 @@ class LPPStrategy(BaseStrategy):
         return self.levels_by_date[current_date][self.tp]
     
     def session_start(self) -> time:
-        return time(10, 0)
+        return self._session_start
 
     def session_end(self) -> time:
-        return time(17, 30)
+        return self._session_end
 
     def prepare(self, df: pd.DataFrame) -> None:
         '''Run once before backtest. Computes LPP levels for every trading day.'''
         times = df['candle_open'].apply(lambda x: datetime.fromisoformat(x).time())
         dates = df['candle_open'].apply(lambda x: datetime.fromisoformat(x).date())
 
-        window_mask = (times >= time(9, 0)) & (times < time(10, 0))
+        window_mask = (times >= self._premarket_start) & (times < self._premarket_end)
         window_df = df[window_mask]
 
         for day_date, day_df in window_df.groupby(dates[window_df.index]):
