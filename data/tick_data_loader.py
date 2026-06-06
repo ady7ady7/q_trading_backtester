@@ -11,19 +11,22 @@ class TickDataLoader:
     """
     Loads raw tick data from CSV and indexes it by date for fast per-day access.
 
-    The raw file schema:
-        ts_recv, ts_recv_berlin, ts_event, price, size, side, symbol, instrument_id
+    Args:
+        file_path: Path to the raw CSV file.
+        timestamp_col: Name of the timestamp column to parse (e.g. 'ts_recv_berlin', 'ts_recv_et').
+        timezone: Target timezone for conversion (e.g. 'Europe/Berlin', 'America/New_York').
 
-    We keep only: datetime (from ts_recv_berlin), price, side.
+    We keep only: datetime (from timestamp_col), price, side.
     Side values: 'B' = aggressive buyer (lifted ask), 'A' = aggressive seller (hit bid), 'N' = ignore.
 
     Attributes:
-        file_path: Path to the raw CSV file.
         ticks_by_date: dict mapping date -> DataFrame(datetime, price, side), sorted by datetime.
     """
 
-    def __init__(self, file_path: str) -> None:
+    def __init__(self, file_path: str, timestamp_col: str = 'ts_recv_berlin', timezone: str = 'Europe/Berlin') -> None:
         self.file_path = file_path
+        self.timestamp_col = timestamp_col
+        self.timezone = timezone
         self.ticks_by_date: dict[object, pd.DataFrame] = {}
 
     def __repr__(self) -> str:
@@ -31,7 +34,7 @@ class TickDataLoader:
 
     def load_and_index(self) -> bool:
         """
-        Load the CSV, parse the Berlin timestamp, and build a per-date index.
+        Load the CSV, parse the timestamp column, and build a per-date index.
 
         Only keeps rows where side is 'B' or 'A' (drops 'N' and any other values).
 
@@ -42,12 +45,12 @@ class TickDataLoader:
             logger.info(f'Loading tick data from {self.file_path}...')
             df = pd.read_csv(
                 self.file_path,
-                usecols=['ts_recv_berlin', 'price', 'side'],
+                usecols=[self.timestamp_col, 'price', 'side'],
                 dtype={'price': float, 'side': str},
             )
 
-            df['datetime'] = pd.to_datetime(df['ts_recv_berlin'], utc=True).dt.tz_convert('Europe/Berlin')
-            df = df.drop(columns=['ts_recv_berlin'])
+            df['datetime'] = pd.to_datetime(df[self.timestamp_col], utc=True).dt.tz_convert(self.timezone)
+            df = df.drop(columns=[self.timestamp_col])
 
             df = df[df['side'].isin(['B', 'A'])].copy()
 

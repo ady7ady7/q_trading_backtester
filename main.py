@@ -99,7 +99,7 @@ def run_backtest(
 
                 if session_ending and current_positions[strategy] is not None:
                     backtest_engine.force_close_all(
-                        'FDAX',
+                        strategy.ticker,
                         strategy.strategy_id,
                         price=row['open'],
                         candle_time=row['candle_close'],
@@ -139,7 +139,7 @@ def run_backtest(
                         tp = strategy.get_tp(row, current_date) if mode == 'SL_TP' else None
 
                         backtest_engine.open_position(
-                            'FDAX',
+                            strategy.ticker,
                             signal,
                             entry=strategy.get_entry(row, current_date),
                             quantity=1,
@@ -156,7 +156,7 @@ def run_backtest(
                             remaining_ticks = session_ticks.loc[entry_idx + 1:]
                             for tick_row in remaining_ticks.itertuples(index=False):
                                 newly_closed = backtest_engine.process_tick(
-                                    'FDAX',
+                                    strategy.ticker,
                                     tick_row.price,
                                     tick_row.side,
                                     tick_time=tick_row.datetime.isoformat(),
@@ -168,7 +168,7 @@ def run_backtest(
         for strategy in strategies:
             if current_positions[strategy] is not None:
                 backtest_engine.force_close_all(
-                    'FDAX',
+                    strategy.ticker,
                     strategy.strategy_id,
                     price=day_df.iloc[-1]['close'],
                     candle_time=day_df.iloc[-1]['candle_close'],
@@ -180,31 +180,42 @@ def run_backtest(
 
 if __name__ == '__main__':
 
-    x = DataLoader('algo_backtest\data\FDAX_M1_OHLC.csv')
-    print(x)
-    data = x.load_data()
-    x.validate_data(data)
-    print(len(data))
-    print(data.head(3))
-
     setup_logging()
-    print('Starting the backtest test procedure in main.py - logging set!')
 
-    tick_loader = TickDataLoader('algo_backtest\data\FDAX_trades_raw.csv')
-    tick_loader.load_and_index()
+    # --- FDAX ---
+    fdax_data = DataLoader('data/FDAX_M1_OHLC.csv').load_data()
+    fdax_tick_loader = TickDataLoader(
+        'data/FDAX_trades_raw.csv',
+        timestamp_col='ts_recv_berlin',
+        timezone='Europe/Berlin',
+    )
+    fdax_tick_loader.load_and_index()
 
-                    #ticker #entry #sl #tp
-    strategies = [
-                LPPStrategy('FDAX', 'BUY', 'LR1_LR2_025', 'LPP_LR1_050', 'LR2'), #4
-                LPPStrategy('FDAX', 'SELL', 'LS2', 'LS2_LS1_050', 'LS3'), #6
-                LPPStrategy('FDAX', 'SELL', 'LR2', 'LR3', 'LPP'), #7
-                LPPStrategy('FDAX', 'SELL', 'LR2_LR3_075', 'LR3', 'LR1'), #8
-                LPPStrategy('FDAX', 'SELL', 'LS2_LS1_025', 'LS2_LS1_050', 'LS3'), #10 BEZ FILTRA modyfikowany S3
-                LPPStrategy('FDAX', 'SELL', 'LS2_LS1_025', 'LS2_LS1_075', 'LS3_LS2_075') #11
-                  ]
-    test_engine = run_backtest(data, strategies, tick_loader, mode='CONDITION_CLOSE')
-    print(test_engine)
-    test_engine.strategy_report()
+    fdax_strategies = [
+        LPPStrategy('FDAX', 'SELL', 'LS2_LS1_025', 'LS2_LS1_050', 'LS3'),         # S10
+        LPPStrategy('FDAX', 'SELL', 'LS2_LS1_025', 'LS2_LS1_075', 'LS3_LS2_075'), # S11
+    ]
+    fdax_engine = run_backtest(fdax_data, fdax_strategies, fdax_tick_loader, mode='SL_TP')
+    print(fdax_engine)
+    fdax_engine.strategy_report()
 
-    for trade in test_engine.completed_trades[::10]:
-        print(trade)
+    # --- NQ ---
+    nq_data = DataLoader('data/NQ_M1_OHLC.csv').load_data()
+    nq_tick_loader = TickDataLoader(
+        'data/NQ_trades_raw.csv',
+        timestamp_col='ts_recv_et',
+        timezone='America/New_York',
+    )
+    nq_tick_loader.load_and_index()
+
+    nq_strategies = [
+        LPPStrategy('NQ', 'SELL', 'LS2_LS1_025', 'LS2_LS1_050', 'LS3',
+                    premarket_start=time(9, 30), premarket_end=time(10, 30),
+                    session_start=time(10, 30), session_end=time(16, 0)),
+        LPPStrategy('NQ', 'SELL', 'LS2_LS1_025', 'LS2_LS1_075', 'LS3_LS2_075',
+                    premarket_start=time(9, 30), premarket_end=time(10, 30),
+                    session_start=time(10, 30), session_end=time(16, 0)),
+    ]
+    nq_engine = run_backtest(nq_data, nq_strategies, nq_tick_loader, mode='SL_TP')
+    print(nq_engine)
+    nq_engine.strategy_report()
